@@ -1,0 +1,16 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  compatibility:
+    needs: build
+    uses: ./.github/workflows/compatibility.yml

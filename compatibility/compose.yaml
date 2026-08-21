@@ -1,0 +1,8 @@
+services:
+  products:
+    build:
+      # The library lives at the repository root, so build from there.
+      context: ..
+      dockerfile: compatibility/Dockerfile
+    ports:
+      - "4001:4001"
