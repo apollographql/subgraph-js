@@ -38,7 +38,6 @@ import {
   ANY_TYPE_NAME,
   ENTITIES_FIELD_NAME,
   ENTITY_TYPE_NAME,
-  FIELD_SET_TYPE_NAME,
   REPRESENTATIONS_ARGUMENT_NAME,
   SERVICE_FIELD_NAME,
   SERVICE_TYPE_NAME,
@@ -229,7 +228,7 @@ function synthesizeMissingDefinitions(
   return synthesized;
 }
 
-function collectSpecNames(
+function collectDefinedNames(
   definitions: ReadonlyArray<DefinitionNode>,
   into: { directives: Set<string>; types: Set<string> },
 ) {
@@ -302,13 +301,10 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
 
   const definedDirectives = new Set<string>();
   const definedTypes = new Set<string>();
-  for (const definition of userDocument.definitions) {
-    const name = definitionName(definition);
-    if (!name) continue;
-    if (definition.kind === Kind.DIRECTIVE_DEFINITION)
-      definedDirectives.add(name);
-    else if (isTypeDefinitionNode(definition)) definedTypes.add(name);
-  }
+  collectDefinedNames(userDocument.definitions, {
+    directives: definedDirectives,
+    types: definedTypes,
+  });
 
   // Specification definitions, under the names this schema gives them.
   const specDefinitions: DefinitionNode[] = [];
@@ -338,7 +334,7 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
     }
   }
 
-  collectSpecNames(specDefinitions, specNames);
+  collectDefinedNames(specDefinitions, specNames);
 
   // Only contribute what the schema has not already declared for itself.
   const injectedSpecDefinitions = specDefinitions.filter((definition) => {
@@ -383,7 +379,6 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
       SERVICE_TYPE_NAME,
       ANY_TYPE_NAME,
       ENTITY_TYPE_NAME,
-      FIELD_SET_TYPE_NAME,
     ],
   };
 

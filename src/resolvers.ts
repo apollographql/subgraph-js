@@ -28,7 +28,6 @@ export interface GraphQLResolverMap<TContext = Record<string, any>> {
         [fieldName: string]:
           | GraphQLFieldResolver<any, TContext>
           | {
-              requires?: string;
               resolve?: GraphQLFieldResolver<any, TContext>;
               subscribe?: GraphQLFieldResolver<any, TContext>;
             };
