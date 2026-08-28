@@ -15,6 +15,10 @@
   ],
   "author": "Apollo <packages@apollographql.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apollographql/subgraph-js.git"
+  },
   "engines": {
     "node": ">=24.0.0"
   },
