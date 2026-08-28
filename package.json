@@ -21,9 +21,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "workspaces": [
-    "compatibility"
-  ],
   "scripts": {
     "build": "tsc --build tsconfig.json",
     "clean": "rm -rf dist",

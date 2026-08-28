@@ -25,7 +25,9 @@ involved.
 ```sh
 npm install          # from the repository root
 npm run build        # build the library
-npm run compatibility --workspace @apollo/subgraph-compatibility
+cd compatibility
+npm install
+npm run compatibility
 ```
 
 Make sure a podman machine is running first (`podman machine start` on macOS).
@@ -41,9 +43,10 @@ reference subgraphs still run as containers. Useful when iterating on the
 library, as it skips the image build.
 
 ```sh
-npm run build --workspace @apollo/subgraph-compatibility
-npm run start --workspace @apollo/subgraph-compatibility &
-npm run compatibility:local --workspace @apollo/subgraph-compatibility
+cd compatibility
+npm run build
+npm run start &
+npm run compatibility:local
 ```
 
 ## Current results

@@ -54,10 +54,12 @@ npm test
 
 #### Compatibility suite
 
-The [`compatibility/`](./compatibility) workspace runs the [Apollo Federation subgraph compatibility suite](https://github.com/apollographql/apollo-federation-subgraph-compatibility) against this library. Any change touching schema assembly, entity resolution, or SDL printing should be verified against it before merging:
+The [`compatibility/`](./compatibility) package runs the [Apollo Federation subgraph compatibility suite](https://github.com/apollographql/apollo-federation-subgraph-compatibility) against this library. Any change touching schema assembly, entity resolution, or SDL printing should be verified against it before merging:
 
 ```shell
-npm run compatibility --workspace @apollo/subgraph-compatibility
+cd compatibility
+npm install
+npm run compatibility
 ```
 
 See the [compatibility README](./compatibility/README.md) for setup (a running podman or docker machine is required) and current results. This suite also runs in CI, on every pull request and on every push to `main`.
