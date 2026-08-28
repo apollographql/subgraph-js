@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  select-mode:
+    name: Select release mode
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    if: github.repository == 'apollographql/subgraph-js'
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.select-mode.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Select mode
+        id: select-mode
+        uses: changesets/action/select-mode@v2
+
+  version:
+    name: Version packages
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'version'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to push the release branch
+      pull-requests: write # required to open/update the release PR
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Version packages
+        uses: changesets/action/version@v2
+        with:
+          pr-title: 'release: on branch ${{ github.ref_name }}'
+          script: npm run changeset-version
+
+  publish:
+    name: Publish to npm
+    needs: select-mode
+    if: needs.select-mode.outputs.mode == 'publish'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # required to push release git tags / create GitHub releases
+      id-token: write # required for npm OIDC trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish to npm
+        uses: changesets/action/publish@v2
+        with:
+          script: npm run release

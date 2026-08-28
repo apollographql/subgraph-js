@@ -1,0 +1,16 @@
+name: Pull Request Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  compatibility:
+    needs: build
+    uses: ./.github/workflows/compatibility.yml

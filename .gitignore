@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Artifacts the compatibility suite writes into the directory it runs from
+results.md
+supergraph.graphql
+supergraph-compose.yaml
+supergraph-config.yaml
+supergraph-dev-config.yaml
+supergraph.config.js
+
+# IDE
+.idea
+
+# LLM
+.claude
