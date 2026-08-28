@@ -82,15 +82,13 @@ npm run build
 npm test
 ```
 
-The [`compatibility/`](./compatibility) package runs the
+The [`compatibility/`](./compatibility) workspace runs the
 [Apollo Federation subgraph compatibility suite](https://github.com/apollographql/apollo-federation-subgraph-compatibility)
 against this library, using docker compose for the router and reference subgraphs. 
 See its [README](./compatibility/README.md).
 
 ```sh
-cd compatibility
-npm install
-npm run compatibility
+npm run compatibility --workspace @apollo/subgraph-compatibility
 ```
 
 ## Contact

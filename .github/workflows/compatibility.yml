@@ -23,13 +23,8 @@ jobs:
       - name: Build library
         run: npm run build
 
-      - name: Install compatibility dependencies
-        run: npm ci
-        working-directory: compatibility
-
       - name: Run compatibility suite
-        run: npm run compatibility
-        working-directory: compatibility
+        run: npm run compatibility --workspace @apollo/subgraph-compatibility
 
       - name: Archive compatibility results
         if: always()
