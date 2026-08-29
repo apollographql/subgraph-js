@@ -19,7 +19,7 @@
   "devDependencies": {
     "@apollo/federation-subgraph-compatibility": "^3.0.1",
     "@apollo/subgraph": "file:..",
-    "@types/node": "^24.13.3",
-    "typescript": "^5.7.2"
+    "@types/node": "24.13.3",
+    "typescript": "5.9.3"
   }
 }
