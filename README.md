@@ -14,6 +14,8 @@ etc) and allows you to easily specify your Federated entity resolvers.
 
 ## Installation
 
+Requires Node.js 22 or later.
+
 ```sh
 npm install @apollo/subgraph graphql
 ```
