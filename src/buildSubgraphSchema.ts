@@ -17,9 +17,9 @@ import {
 } from 'graphql';
 import { GraphQLSchemaValidationError } from './errors';
 import {
-  FEDERATION_NAMESPACE,
   LINK_NAMESPACE,
   applyLinkNaming,
+  findConnectLink,
   findFederationLink,
   hasLinkDirective,
   linkedDirectiveName,
@@ -30,6 +30,7 @@ import {
   modulesFromSDL,
 } from './resolvers';
 import {
+  connectSpecDocument,
   federation1SpecDocument,
   federationSpecDocument,
   linkSpecDocument,
@@ -319,7 +320,7 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
     const federationSpec = applyLinkNaming(
       federationSpecDocument(link.version),
       link.imports,
-      FEDERATION_NAMESPACE,
+      link.namespace,
     );
     specDefinitions.push(
       ...linkSpec.definitions,
@@ -336,6 +337,21 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
 
   collectDefinedNames(specDefinitions, specNames);
 
+  // Connectors are run by the router, so only their definitions are provided
+  // here; validating how they are used is left to composition. Added after
+  // `specNames` is collected: these are not federation elements, so a
+  // Federation 1 subgraph's own connect definitions stay in `_service { sdl }`.
+  const connectLink = findConnectLink(userDocument);
+  if (connectLink) {
+    specDefinitions.push(
+      ...applyLinkNaming(
+        connectSpecDocument(),
+        connectLink.imports,
+        connectLink.namespace,
+      ).definitions,
+    );
+  }
+
   // Only contribute what the schema has not already declared for itself.
   const injectedSpecDefinitions = specDefinitions.filter((definition) => {
     const name = definitionName(definition);
@@ -346,7 +362,7 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
   });
 
   const keyDirectiveName = link
-    ? linkedDirectiveName(link.imports, FEDERATION_NAMESPACE, 'key')
+    ? linkedDirectiveName(link.imports, link.namespace, 'key')
     : 'key';
 
   const synthesizedDefinitions = synthesizeMissingDefinitions(userDocument);

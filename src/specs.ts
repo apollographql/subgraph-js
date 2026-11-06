@@ -1,8 +1,8 @@
 /**
- * The Apollo Federation and `@link` specification definitions.
+ * The Apollo Federation, `@link` and Apollo Connectors specification definitions.
  *
- * This module is the only place in the library that knows what the federation
- * specification contains. Everything else works with plain `graphql-js` AST and
+ * This module is the only place in the library that knows what those
+ * specifications contain. Everything else works with plain `graphql-js` AST and
  * schema objects.
  *
  * The definitions are kept as one entry per SDL definition, tagged with the
@@ -14,6 +14,7 @@ import { DocumentNode, Kind, parse } from 'graphql';
 
 export const FEDERATION_SPEC_IDENTITY = 'https://specs.apollo.dev/federation';
 export const LINK_SPEC_IDENTITY = 'https://specs.apollo.dev/link';
+export const CONNECT_SPEC_IDENTITY = 'https://specs.apollo.dev/connect';
 
 export interface SpecVersion {
   major: number;
@@ -31,6 +32,10 @@ export function printVersion({ major, minor }: SpecVersion): string {
 
 /** The most recent federation version this library knows how to link against. */
 export const LATEST_FEDERATION_VERSION: SpecVersion = { major: 2, minor: 15 };
+
+/** The oldest and most recent connect versions this library knows how to link against. */
+export const EARLIEST_CONNECT_VERSION: SpecVersion = { major: 0, minor: 1 };
+export const LATEST_CONNECT_VERSION: SpecVersion = { major: 0, minor: 4 };
 
 const version = (major: number, minor: number) => versionCode({ major, minor });
 
@@ -202,6 +207,60 @@ directive @extends on OBJECT | INTERFACE
 directive @tag(name: String!) repeatable on ${TAG_LOCATIONS}
 `;
 
+/**
+ * The Apollo Connectors specification, `https://specs.apollo.dev/connect/v0.x`.
+ *
+ * Every released version shares the same definitions: the differences between
+ * versions (connectors on types, virtual connectors, mapping grammar, ...) are
+ * enforced by composition, not by the SDL. This must stay identical to the
+ * definitions composition expects, which rejects unknown or retyped input fields.
+ *
+ * @see {@link https://www.apollographql.com/docs/graphos/connectors/reference/directives Apollo Connectors} for details.
+ */
+const CONNECT_SPEC_SDL = `
+directive @connect(source: String, id: String, http: ConnectHTTP, batch: ConnectBatch, errors: ConnectorErrors, selection: JSONSelection!, entity: Boolean = false, isSuccess: JSONSelection) repeatable on FIELD_DEFINITION | OBJECT
+
+directive @source(name: String!, http: SourceHTTP!, errors: ConnectorErrors, isSuccess: JSONSelection) repeatable on SCHEMA
+
+scalar JSONSelection
+
+scalar URLPathTemplate
+
+input ConnectorErrors {
+  message: JSONSelection
+  extensions: JSONSelection
+}
+
+input HTTPHeaderMapping {
+  name: String!
+  from: String
+  value: String
+}
+
+input ConnectBatch {
+  maxSize: Int
+}
+
+input SourceHTTP {
+  baseURL: String!
+  headers: [HTTPHeaderMapping!]
+  path: JSONSelection
+  queryParams: JSONSelection
+}
+
+input ConnectHTTP {
+  GET: URLPathTemplate
+  POST: URLPathTemplate
+  PUT: URLPathTemplate
+  PATCH: URLPathTemplate
+  DELETE: URLPathTemplate
+  body: JSONSelection
+  headers: [HTTPHeaderMapping!]
+  path: JSONSelection
+  queryParams: JSONSelection
+}
+`;
+
 function documentFrom(sdl: string): DocumentNode {
   return parse(sdl, { noLocation: true });
 }
@@ -241,13 +300,23 @@ export function federation1SpecDocument(): DocumentNode {
   return (federation1Document ??= documentFrom(FEDERATION_1_SDL));
 }
 
+let connectDocument: DocumentNode | undefined;
+
 /**
- * The names a `@link(import: [...])` may legally reference for `version`.
+ * The connect specification definitions, under their canonical names. The same
+ * for every supported connect version.
+ */
+export function connectSpecDocument(): DocumentNode {
+  return (connectDocument ??= documentFrom(CONNECT_SPEC_SDL));
+}
+
+/**
+ * The names a `@link(import: [...])` may legally reference from `specDocument`.
  * Directives are keyed with their leading `@`, matching the `import` syntax.
  */
-export function importableNames(version: SpecVersion): Set<string> {
+export function importableNames(specDocument: DocumentNode): Set<string> {
   const names = new Set<string>();
-  for (const definition of federationSpecDocument(version).definitions) {
+  for (const definition of specDocument.definitions) {
     switch (definition.kind) {
       case Kind.DIRECTIVE_DEFINITION:
         names.add(`@${definition.name.value}`);

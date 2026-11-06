@@ -1,5 +1,10 @@
 import { ASTNode, GraphQLError, print } from 'graphql';
-import { LATEST_FEDERATION_VERSION, printVersion } from './specs';
+import {
+  EARLIEST_CONNECT_VERSION,
+  LATEST_CONNECT_VERSION,
+  LATEST_FEDERATION_VERSION,
+  printVersion,
+} from './specs';
 
 /** Thrown when the assembled subgraph schema is not a valid GraphQL schema. */
 export class GraphQLSchemaValidationError extends Error {
@@ -37,17 +42,39 @@ export class UnsupportedFederationVersionError extends FederationError {
   }
 }
 
+export class MultipleConnectLinksError extends FederationError {
+  constructor(links: ReadonlyArray<ASTNode>) {
+    super(
+      `Schema links the connect specification more than once. Only a single ` +
+        `@link to https://specs.apollo.dev/connect is allowed, found:\n` +
+        links.map((link) => `\t${print(link)}`).join('\n'),
+    );
+  }
+}
+
+export class UnsupportedConnectVersionError extends FederationError {
+  constructor(url: string) {
+    super(
+      `Unsupported connect version linked from "${url}". Expected a URL of the ` +
+        `form https://specs.apollo.dev/connect/v0.x, from ` +
+        `${printVersion(EARLIEST_CONNECT_VERSION)} up to ` +
+        `${printVersion(LATEST_CONNECT_VERSION)}.`,
+    );
+  }
+}
+
 export class UnsupportedLinkImportError extends FederationError {
   constructor(message: string) {
     super(message);
   }
 
+  /** `specification` names what was linked, e.g. `federation specification v2.5`. */
   static unknownName(
     name: string,
-    version: string,
+    specification: string,
   ): UnsupportedLinkImportError {
     return new UnsupportedLinkImportError(
-      `Cannot import "${name}": it is not part of the federation specification ${version}.`,
+      `Cannot import "${name}": it is not part of the ${specification}.`,
     );
   }
 

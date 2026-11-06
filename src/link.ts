@@ -1,7 +1,7 @@
 /**
- * `@link` handling: finding the federation link in a subgraph document, reading
- * its `import` list, and applying the resulting naming to the specification
- * definitions this library injects.
+ * `@link` handling: finding the federation and connect links in a subgraph
+ * document, reading their `import` lists, and applying the resulting naming to
+ * the specification definitions this library injects.
  */
 import {
   ConstDirectiveNode,
@@ -12,14 +12,21 @@ import {
   visit,
 } from 'graphql';
 import {
+  MultipleConnectLinksError,
   MultipleFederationLinksError,
+  UnsupportedConnectVersionError,
   UnsupportedFederationVersionError,
   UnsupportedLinkImportError,
 } from './errors';
 import {
+  CONNECT_SPEC_IDENTITY,
+  EARLIEST_CONNECT_VERSION,
   FEDERATION_SPEC_IDENTITY,
+  LATEST_CONNECT_VERSION,
   LATEST_FEDERATION_VERSION,
   SpecVersion,
+  connectSpecDocument,
+  federationSpecDocument,
   importableNames,
   printVersion,
   versionCode,
@@ -29,10 +36,17 @@ const LINK_DIRECTIVE_NAME = 'link';
 
 export const FEDERATION_NAMESPACE = 'federation';
 export const LINK_NAMESPACE = 'link';
+export const CONNECT_NAMESPACE = 'connect';
 
-export interface FederationLink {
+/** A schema's `@link` to one of the specifications this library knows. */
+export interface SpecLink {
   url: string;
   version: SpecVersion;
+  /**
+   * Prefix given to elements that are not explicitly imported: the `as`
+   * argument of the `@link`, or the specification's own name.
+   */
+  namespace: string;
   /**
    * Maps a canonical specification name to the name it takes in this schema.
    * Directives are keyed with their leading `@`, as they are written in `import`.
@@ -42,6 +56,9 @@ export interface FederationLink {
   /** `@link` directive definition application */
   node: ConstDirectiveNode;
 }
+
+export type FederationLink = SpecLink;
+export type ConnectLink = SpecLink;
 
 function schemaLevelDirectives(document: DocumentNode): ConstDirectiveNode[] {
   const directives: ConstDirectiveNode[] = [];
@@ -73,6 +90,43 @@ export function hasLinkDirective(document: DocumentNode): boolean {
   );
 }
 
+/** Every schema-level `@link` whose `url` points at the specification `identity`. */
+function linksTo(
+  document: DocumentNode,
+  identity: string,
+): ConstDirectiveNode[] {
+  return schemaLevelDirectives(document).filter((directive) => {
+    if (directive.name.value !== LINK_DIRECTIVE_NAME) return false;
+    const url = stringArgument(directive, 'url');
+    return url !== undefined && url.startsWith(`${identity}/`);
+  });
+}
+
+/** Reads the `vX.Y` suffix of a specification URL. */
+function parseVersion(url: string): SpecVersion | null {
+  const match = /\/v(\d+)\.(\d+)\/?$/.exec(url);
+  if (!match) return null;
+  return { major: Number(match[1]), minor: Number(match[2]) };
+}
+
+function specLink(
+  node: ConstDirectiveNode,
+  version: SpecVersion,
+  defaultNamespace: string,
+  specDocument: DocumentNode,
+  specification: string,
+): SpecLink {
+  // Callers only pass links whose `url` matched, so it is present.
+  const url = stringArgument(node, 'url')!;
+  const imports = parseImports(
+    node,
+    importableNames(specDocument),
+    `${specification} ${printVersion(version)}`,
+  );
+  const namespace = stringArgument(node, 'as') ?? defaultNamespace;
+  return { url, version, namespace, imports, node };
+}
+
 /**
  * Finds the `@link` pointing at the federation specification, if any. A document
  * without one is treated as a Federation 1 subgraph.
@@ -80,41 +134,65 @@ export function hasLinkDirective(document: DocumentNode): boolean {
 export function findFederationLink(
   document: DocumentNode,
 ): FederationLink | null {
-  const links = schemaLevelDirectives(document).filter((directive) => {
-    if (directive.name.value !== LINK_DIRECTIVE_NAME) return false;
-    const url = stringArgument(directive, 'url');
-    return url !== undefined && url.startsWith(`${FEDERATION_SPEC_IDENTITY}/`);
-  });
-
+  const links = linksTo(document, FEDERATION_SPEC_IDENTITY);
   if (links.length === 0) return null;
   if (links.length > 1) throw new MultipleFederationLinksError(links);
 
   const node = links[0];
-  // `stringArgument` already matched, so `url` is present.
   const url = stringArgument(node, 'url')!;
-  const version = parseFederationVersion(url);
-  const imports = parseImports(node, version);
-
-  return { url, version, imports, node };
-}
-
-function parseFederationVersion(url: string): SpecVersion {
-  const match = /\/v(\d+)\.(\d+)\/?$/.exec(url);
-  if (!match) throw new UnsupportedFederationVersionError(url);
-
-  const version = { major: Number(match[1]), minor: Number(match[2]) };
+  const version = parseVersion(url);
   if (
+    !version ||
     version.major !== LATEST_FEDERATION_VERSION.major ||
     versionCode(version) > versionCode(LATEST_FEDERATION_VERSION)
   ) {
     throw new UnsupportedFederationVersionError(url);
   }
-  return version;
+
+  return specLink(
+    node,
+    version,
+    FEDERATION_NAMESPACE,
+    federationSpecDocument(version),
+    'federation specification',
+  );
+}
+
+/**
+ * Finds the `@link` pointing at the Apollo Connectors specification, if any.
+ *
+ * Only the definitions are provided: whether connectors are used correctly, and
+ * whether the linked federation version supports them, is composition's job.
+ */
+export function findConnectLink(document: DocumentNode): ConnectLink | null {
+  const links = linksTo(document, CONNECT_SPEC_IDENTITY);
+  if (links.length === 0) return null;
+  if (links.length > 1) throw new MultipleConnectLinksError(links);
+
+  const node = links[0];
+  const url = stringArgument(node, 'url')!;
+  const version = parseVersion(url);
+  if (
+    !version ||
+    versionCode(version) < versionCode(EARLIEST_CONNECT_VERSION) ||
+    versionCode(version) > versionCode(LATEST_CONNECT_VERSION)
+  ) {
+    throw new UnsupportedConnectVersionError(url);
+  }
+
+  return specLink(
+    node,
+    version,
+    CONNECT_NAMESPACE,
+    connectSpecDocument(),
+    'connect specification',
+  );
 }
 
 function parseImports(
   link: ConstDirectiveNode,
-  version: SpecVersion,
+  importable: Set<string>,
+  specification: string,
 ): Map<string, string> {
   const imports = new Map<string, string>();
   const importArgument = link.arguments?.find(
@@ -125,12 +203,10 @@ function parseImports(
     throw UnsupportedLinkImportError.malformed(importArgument.value);
   }
 
-  const importable = importableNames(version);
-
   for (const entry of importArgument.value.values) {
     const { name, alias } = parseImportEntry(entry);
     if (!importable.has(name)) {
-      throw UnsupportedLinkImportError.unknownName(name, printVersion(version));
+      throw UnsupportedLinkImportError.unknownName(name, specification);
     }
     imports.set(name, alias);
   }
@@ -213,6 +289,12 @@ export function applyLinkNaming(
       };
     },
     EnumTypeDefinition(node) {
+      return {
+        ...node,
+        name: { ...node.name, value: rename(node.name.value) },
+      };
+    },
+    InputObjectTypeDefinition(node) {
       return {
         ...node,
         name: { ...node.name, value: rename(node.name.value) },

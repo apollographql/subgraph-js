@@ -76,6 +76,23 @@ await startStandaloneServer(server, { listen: { port: 4001 } });
 Entity references are resolved through `__resolveReference`, either from a
 resolver map or from `extensions.apollo.subgraph.resolveReference` on the type.
 
+### Apollo Connectors
+
+Schemas that `@link` the [Apollo Connectors](https://www.apollographql.com/docs/graphos/connectors)
+specification (`https://specs.apollo.dev/connect/v0.1` through `v0.4`) get the
+`@connect` and `@source` directives and their supporting types, so connectors
+schemas can be built, printed and inspected:
+
+```graphql
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.12", import: ["@key"])
+  @link(url: "https://specs.apollo.dev/connect/v0.3", import: ["@connect", "@source"])
+  @source(name: "api", http: { baseURL: "https://api.example.com" })
+```
+
+Connectors are executed by the router, not by this library, and whether they are
+used correctly is validated by composition.
+
 ## Development
 
 ```sh
