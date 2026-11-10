@@ -17,8 +17,10 @@ import {
 } from 'graphql';
 import { GraphQLSchemaValidationError } from './errors';
 import {
+  CONNECT_NAMESPACE,
   LINK_NAMESPACE,
   applyLinkNaming,
+  findConnectLink,
   findFederationLink,
   findLinkSpecImports,
   hasLinkDirective,
@@ -30,6 +32,7 @@ import {
   modulesFromSDL,
 } from './resolvers';
 import {
+  connectSpecDocument,
   federation1SpecDocument,
   federationSpecDocument,
   linkSpecDocument,
@@ -336,6 +339,22 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
 
   collectDefinedNames(specDefinitions, specNames);
 
+  // Connectors are run by the router, so only their definitions are provided
+  // here; validating how they are used is left to composition. Added after
+  // `specNames` is collected: these are not federation elements, so a
+  // Federation 1 subgraph's own connect definitions stay in `_service { sdl }`.
+  const connectLink = findConnectLink(userDocument);
+  if (connectLink) {
+    specDefinitions.push(
+      ...applyLinkNaming(
+        connectSpecDocument(),
+        connectLink.imports,
+        connectLink.namespace,
+        CONNECT_NAMESPACE,
+      ).definitions,
+    );
+  }
+
   // Only contribute what the schema has not already declared for itself.
   const injectedSpecDefinitions = specDefinitions.filter((definition) => {
     const name = definitionName(definition);
@@ -385,11 +404,17 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
   // Federation 2 composition reads a subgraph's `@link`s to interpret it, so the
   // whole assembled document is published. Federation 1 composition predates
   // `@link` and fails if a subgraph declares the federation directives itself,
-  // so those are held back for it.
+  // so those are held back for it. A connectors subgraph also leaves out the
+  // `_service` / `_entities` machinery: composition requires every field of it
+  // to be resolved by a connector and rejects unions such as `_Entity`.
   const serviceSdl = () =>
     printDefinitions(
       isFederation2
-        ? document.definitions
+        ? connectLink
+          ? document.definitions.filter(
+              (definition) => !machineryDefinitions.includes(definition),
+            )
+          : document.definitions
         : withoutFederationElements(
             [...userDocument.definitions, ...synthesizedDefinitions],
             federationElementNames,
