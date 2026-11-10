@@ -349,6 +349,22 @@ describe('@link', () => {
     ).toThrow(UnsupportedFederationVersionError);
   });
 
+  it('treats a url with extra path segments under federation as a custom specification', () => {
+    const schema = buildSubgraphSchema(
+      parse(`
+        ${fed2('v2.9', '"@key"')}
+        extend schema @link(url: "https://specs.apollo.dev/federation/extra/v1.0", import: ["@foo"])
+        directive @foo on FIELD_DEFINITION
+        type Product @key(fields: "id") { id: ID! name: String @foo }
+      `),
+    );
+
+    expect(schema.getDirective('key')).toBeDefined();
+    expect(
+      (schema.getType('_Entity') as GraphQLUnionType).getTypes(),
+    ).toHaveLength(1);
+  });
+
   it('rejects an import the linked version does not define', () => {
     expect(() =>
       buildSubgraphSchema(

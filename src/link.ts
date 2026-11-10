@@ -84,7 +84,16 @@ export function hasLinkDirective(document: DocumentNode): boolean {
   );
 }
 
-/** Every schema-level `@link` whose `url` points at the specification `identity`. */
+/**
+ * Every schema-level `@link` whose `url` points at the specification `identity`.
+ *
+ * As in composition, the last path segment of a `url` is the version and the one
+ * before it is the specification name, so only the version may follow the
+ * identity: `https://specs.apollo.dev/federation/extra/v2.9` links a custom
+ * specification named `extra`, not federation. A trailing slash is still
+ * matched, so that a malformed version (`.../federation/v2.9/`) is reported
+ * against this specification rather than silently ignored.
+ */
 function linksTo(
   document: DocumentNode,
   identity: string,
@@ -92,13 +101,14 @@ function linksTo(
   return schemaLevelDirectives(document).filter((directive) => {
     if (directive.name.value !== LINK_DIRECTIVE_NAME) return false;
     const url = stringArgument(directive, 'url');
-    return url !== undefined && url.startsWith(`${identity}/`);
+    if (url === undefined || !url.startsWith(`${identity}/`)) return false;
+    return /^[^/]*\/?$/.test(url.slice(identity.length + 1));
   });
 }
 
-/** Reads the `vX.Y` suffix of a specification URL. */
-function parseVersion(url: string): SpecVersion | null {
-  const match = /\/v(\d+)\.(\d+)$/.exec(url);
+/** Reads the `vX.Y` version following `identity` in a specification `url`. */
+function parseVersion(url: string, identity: string): SpecVersion | null {
+  const match = /^v(\d+)\.(\d+)$/.exec(url.slice(identity.length + 1));
   if (!match) return null;
   return { major: Number(match[1]), minor: Number(match[2]) };
 }
@@ -134,7 +144,7 @@ export function findFederationLink(
 
   const node = links[0];
   const url = stringArgument(node, 'url')!;
-  const version = parseVersion(url);
+  const version = parseVersion(url, FEDERATION_SPEC_IDENTITY);
   if (
     !version ||
     version.major !== LATEST_FEDERATION_VERSION.major ||
@@ -165,7 +175,10 @@ export function findLinkSpecImports(
   const [bootstrap] = linksTo(document, LINK_SPEC_IDENTITY);
   if (!bootstrap) return imports;
 
-  const version = parseVersion(stringArgument(bootstrap, 'url')!);
+  const version = parseVersion(
+    stringArgument(bootstrap, 'url')!,
+    LINK_SPEC_IDENTITY,
+  );
   const specification = version
     ? `link specification ${printVersion(version)}`
     : 'link specification';
