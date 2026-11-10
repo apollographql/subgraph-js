@@ -341,6 +341,14 @@ describe('@link', () => {
     ).toThrow(UnsupportedFederationVersionError);
   });
 
+  it('rejects a federation @link url with a trailing slash', () => {
+    expect(() =>
+      buildSubgraphSchema(
+        parse(`${fed2('v2.9/')} type Query { hello: String }`),
+      ),
+    ).toThrow(UnsupportedFederationVersionError);
+  });
+
   it('rejects an import the linked version does not define', () => {
     expect(() =>
       buildSubgraphSchema(
@@ -361,6 +369,76 @@ describe('@link', () => {
         `),
       ),
     ).toThrow(MultipleFederationLinksError);
+  });
+
+  it('namespaces federation definitions under the @link alias', () => {
+    const schema = buildSubgraphSchema(
+      parse(`
+        extend schema @link(url: "https://specs.apollo.dev/federation/v2.9", as: "fed")
+        type Product @fed__key(fields: "id") { id: ID! }
+      `),
+    );
+
+    expect(schema.getDirective('fed__key')).toBeDefined();
+    expect(schema.getDirective('federation__key')).toBeUndefined();
+    expect(schema.getType('fed__FieldSet')).toBeDefined();
+    expect(
+      (schema.getType('_Entity') as GraphQLUnionType).getTypes(),
+    ).toHaveLength(1);
+  });
+
+  it('names link specification types after the link spec imports', () => {
+    const schema = buildSubgraphSchema(
+      parse(`
+        schema @link(url: "https://specs.apollo.dev/link/v1.0", import: ["Import", { name: "Purpose", as: "LinkPurpose" }]) {
+          query: Query
+        }
+        extend schema @link(url: "https://specs.apollo.dev/federation/v2.9", import: ["@key"])
+        type Query { hello: String }
+      `),
+    );
+
+    expect(schema.getType('Import')).toBeDefined();
+    expect(schema.getType('LinkPurpose')).toBeDefined();
+    expect(schema.getType('link__Import')).toBeUndefined();
+    expect(schema.getType('link__Purpose')).toBeUndefined();
+    expect(
+      schema
+        .getDirective('link')!
+        .args.map((arg) => `${arg.name}: ${arg.type}`),
+    ).toEqual([
+      'url: String',
+      'as: String',
+      'for: LinkPurpose',
+      'import: [Import]',
+    ]);
+  });
+
+  it('namespaces link specification types that are not imported', () => {
+    const schema = buildSubgraphSchema(
+      parse(`
+        schema @link(url: "https://specs.apollo.dev/link/v1.0") { query: Query }
+        extend schema @link(url: "https://specs.apollo.dev/federation/v2.9", import: ["@key"])
+        type Query { hello: String }
+      `),
+    );
+
+    expect(schema.getType('link__Import')).toBeDefined();
+    expect(schema.getType('link__Purpose')).toBeDefined();
+  });
+
+  it('rejects an import the link specification does not define', () => {
+    expect(() =>
+      buildSubgraphSchema(
+        parse(`
+          schema @link(url: "https://specs.apollo.dev/link/v1.0", import: ["FieldSet"]) { query: Query }
+          extend schema @link(url: "https://specs.apollo.dev/federation/v2.9")
+          type Query { hello: String }
+        `),
+      ),
+    ).toThrow(
+      'Cannot import "FieldSet": it is not part of the link specification v1.0.',
+    );
   });
 
   it('defines @link for a schema that only links a custom specification', () => {

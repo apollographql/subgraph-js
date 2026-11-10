@@ -17,10 +17,10 @@ import {
 } from 'graphql';
 import { GraphQLSchemaValidationError } from './errors';
 import {
-  FEDERATION_NAMESPACE,
   LINK_NAMESPACE,
   applyLinkNaming,
   findFederationLink,
+  findLinkSpecImports,
   hasLinkDirective,
   linkedDirectiveName,
 } from './link';
@@ -313,13 +313,13 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
   if (link) {
     const linkSpec = applyLinkNaming(
       linkSpecDocument(),
-      new Map([['@link', '@link']]),
+      findLinkSpecImports(userDocument),
       LINK_NAMESPACE,
     );
     const federationSpec = applyLinkNaming(
       federationSpecDocument(link.version),
       link.imports,
-      FEDERATION_NAMESPACE,
+      link.namespace,
     );
     specDefinitions.push(
       ...linkSpec.definitions,
@@ -346,7 +346,7 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
   });
 
   const keyDirectiveName = link
-    ? linkedDirectiveName(link.imports, FEDERATION_NAMESPACE, 'key')
+    ? linkedDirectiveName(link.imports, link.namespace, 'key')
     : 'key';
 
   const synthesizedDefinitions = synthesizeMissingDefinitions(userDocument);
