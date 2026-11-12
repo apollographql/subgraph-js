@@ -53,7 +53,7 @@
     "@changesets/cli": "^3.0.1",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.13.3",
-    "graphql": "^16.11.0",
+    "graphql": "^17.0.0",
     "graphql-tag": "^2.12.7",
     "jest": "^29.7.0",
     "prettier": "^3.9.6",
