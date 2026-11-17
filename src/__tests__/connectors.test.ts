@@ -350,7 +350,8 @@ describe('Apollo Connectors', () => {
         `),
       ),
     ).toThrow(
-      /Directive "@connect" argument "selection" of type "connect__JSONSelection!" is required/,
+      // graphql v16 and v17 word this error differently
+      /(Directive "@connect" argument "selection"|Argument "@connect\(selection:\)") of type "connect__JSONSelection!" is required/,
     );
   });
 });
