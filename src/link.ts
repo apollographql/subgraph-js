@@ -1,7 +1,7 @@
 /**
- * `@link` handling: finding the federation link in a subgraph document, reading
- * its `import` list, and applying the resulting naming to the specification
- * definitions this library injects.
+ * `@link` handling: finding the federation and connect links in a subgraph
+ * document, reading their `import` lists, and applying the resulting naming to
+ * the specification definitions this library injects.
  */
 import {
   ConstDirectiveNode,
@@ -12,15 +12,21 @@ import {
   visit,
 } from 'graphql';
 import {
+  MultipleConnectLinksError,
   MultipleFederationLinksError,
+  UnsupportedConnectVersionError,
   UnsupportedFederationVersionError,
   UnsupportedLinkImportError,
 } from './errors';
 import {
+  CONNECT_SPEC_IDENTITY,
+  EARLIEST_CONNECT_VERSION,
   FEDERATION_SPEC_IDENTITY,
+  LATEST_CONNECT_VERSION,
   LATEST_FEDERATION_VERSION,
   LINK_SPEC_IDENTITY,
   SpecVersion,
+  connectSpecDocument,
   federationSpecDocument,
   linkSpecDocument,
   importableNames,
@@ -32,6 +38,7 @@ const LINK_DIRECTIVE_NAME = 'link';
 
 export const FEDERATION_NAMESPACE = 'federation';
 export const LINK_NAMESPACE = 'link';
+export const CONNECT_NAMESPACE = 'connect';
 
 /** A schema's `@link` to one of the specifications this library knows. */
 export interface SpecLink {
@@ -53,6 +60,7 @@ export interface SpecLink {
 }
 
 export type FederationLink = SpecLink;
+export type ConnectLink = SpecLink;
 
 function schemaLevelDirectives(document: DocumentNode): ConstDirectiveNode[] {
   const directives: ConstDirectiveNode[] = [];
@@ -163,6 +171,37 @@ export function findFederationLink(
 }
 
 /**
+ * Finds the `@link` pointing at the Apollo Connectors specification, if any.
+ *
+ * Only the definitions are provided: whether connectors are used correctly, and
+ * whether the linked federation version supports them, is composition's job.
+ */
+export function findConnectLink(document: DocumentNode): ConnectLink | null {
+  const links = linksTo(document, CONNECT_SPEC_IDENTITY);
+  if (links.length === 0) return null;
+  if (links.length > 1) throw new MultipleConnectLinksError(links);
+
+  const node = links[0];
+  const url = stringArgument(node, 'url')!;
+  const version = parseVersion(url, CONNECT_SPEC_IDENTITY);
+  if (
+    !version ||
+    versionCode(version) < versionCode(EARLIEST_CONNECT_VERSION) ||
+    versionCode(version) > versionCode(LATEST_CONNECT_VERSION)
+  ) {
+    throw new UnsupportedConnectVersionError(url);
+  }
+
+  return specLink(
+    node,
+    version,
+    CONNECT_NAMESPACE,
+    connectSpecDocument(),
+    'connect specification',
+  );
+}
+
+/**
  * The names the link specification's own elements take in this schema. `@link`
  * itself is never renamed, but `Import` and `Purpose` follow the `import` list of
  * the schema's `@link(url: "https://specs.apollo.dev/link/v1.0")`, if any, and
@@ -245,14 +284,20 @@ function parseImportEntry(entry: ConstValueNode): {
 /**
  * The name a canonical specification element takes in this schema: its alias if
  * it was imported, otherwise the namespaced form (`@key` -> `@federation__key`).
+ * A directive named after its specification (`@connect` in `connect/v0.x`) is
+ * the exception: it takes the namespace itself (`@connect`, or `@<as>`).
  */
 export function linkedName(
   imports: Map<string, string>,
   namespace: string,
   canonical: string,
+  specName?: string,
 ): string {
   const alias = imports.get(canonical);
   if (alias) return alias;
+  if (specName !== undefined && canonical === `@${specName}`) {
+    return `@${namespace}`;
+  }
   return canonical.startsWith('@')
     ? `@${namespace}__${canonical.slice(1)}`
     : `${namespace}__${canonical}`;
@@ -276,9 +321,10 @@ export function applyLinkNaming(
   document: DocumentNode,
   imports: Map<string, string>,
   namespace: string,
+  specName?: string,
 ): DocumentNode {
   const rename = (canonical: string) =>
-    linkedName(imports, namespace, canonical);
+    linkedName(imports, namespace, canonical, specName);
 
   return visit(document, {
     DirectiveDefinition(node) {
@@ -292,6 +338,12 @@ export function applyLinkNaming(
       };
     },
     EnumTypeDefinition(node) {
+      return {
+        ...node,
+        name: { ...node.name, value: rename(node.name.value) },
+      };
+    },
+    InputObjectTypeDefinition(node) {
       return {
         ...node,
         name: { ...node.name, value: rename(node.name.value) },

@@ -16,13 +16,17 @@ export { entitiesResolver } from './types';
 export {
   FederationError,
   GraphQLSchemaValidationError,
+  MultipleConnectLinksError,
   MultipleFederationLinksError,
+  UnsupportedConnectVersionError,
   UnsupportedFederationVersionError,
   UnsupportedLinkImportError,
 } from './errors';
 
 export {
+  CONNECT_SPEC_IDENTITY,
   FEDERATION_SPEC_IDENTITY,
+  LATEST_CONNECT_VERSION,
   LATEST_FEDERATION_VERSION,
   LINK_SPEC_IDENTITY,
   type SpecVersion,
