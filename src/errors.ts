@@ -42,12 +42,13 @@ export class UnsupportedLinkImportError extends FederationError {
     super(message);
   }
 
+  /** `specification` names what was linked, e.g. `federation specification v2.5`. */
   static unknownName(
     name: string,
-    version: string,
+    specification: string,
   ): UnsupportedLinkImportError {
     return new UnsupportedLinkImportError(
-      `Cannot import "${name}": it is not part of the federation specification ${version}.`,
+      `Cannot import "${name}": it is not part of the ${specification}.`,
     );
   }
 

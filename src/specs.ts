@@ -242,12 +242,12 @@ export function federation1SpecDocument(): DocumentNode {
 }
 
 /**
- * The names a `@link(import: [...])` may legally reference for `version`.
+ * The names a `@link(import: [...])` may legally reference from `specDocument`.
  * Directives are keyed with their leading `@`, matching the `import` syntax.
  */
-export function importableNames(version: SpecVersion): Set<string> {
+export function importableNames(specDocument: DocumentNode): Set<string> {
   const names = new Set<string>();
-  for (const definition of federationSpecDocument(version).definitions) {
+  for (const definition of specDocument.definitions) {
     switch (definition.kind) {
       case Kind.DIRECTIVE_DEFINITION:
         names.add(`@${definition.name.value}`);

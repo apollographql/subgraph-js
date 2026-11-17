@@ -17,10 +17,10 @@ import {
 } from 'graphql';
 import { GraphQLSchemaValidationError } from './errors';
 import {
-  FEDERATION_NAMESPACE,
   LINK_NAMESPACE,
   applyLinkNaming,
   findFederationLink,
+  findLinkSpecImports,
   hasLinkDirective,
   linkedDirectiveName,
 } from './link';
@@ -310,28 +310,27 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
   const specDefinitions: DefinitionNode[] = [];
   const specNames = { directives: new Set<string>(), types: new Set<string>() };
 
+  // Any `@link` needs the link specification itself, named after the schema's
+  // link spec imports whether or not it also links federation.
+  const linkSpec = hasLinkDirective(userDocument)
+    ? applyLinkNaming(
+        linkSpecDocument(),
+        findLinkSpecImports(userDocument),
+        LINK_NAMESPACE,
+      )
+    : null;
+  if (linkSpec) specDefinitions.push(...linkSpec.definitions);
+
   if (link) {
-    const linkSpec = applyLinkNaming(
-      linkSpecDocument(),
-      new Map([['@link', '@link']]),
-      LINK_NAMESPACE,
-    );
     const federationSpec = applyLinkNaming(
       federationSpecDocument(link.version),
       link.imports,
-      FEDERATION_NAMESPACE,
+      link.namespace,
     );
-    specDefinitions.push(
-      ...linkSpec.definitions,
-      ...federationSpec.definitions,
-    );
+    specDefinitions.push(...federationSpec.definitions);
   } else {
-    // Federation 1: no `@link`, so nothing is namespaced or renamed.
+    // Federation 1: no federation `@link`, so its elements are not renamed.
     specDefinitions.push(...federation1SpecDocument().definitions);
-    if (hasLinkDirective(userDocument)) {
-      // A `@link` to some non-federation specification still needs `@link` itself.
-      specDefinitions.push(...linkSpecDocument().definitions);
-    }
   }
 
   collectDefinedNames(specDefinitions, specNames);
@@ -346,7 +345,7 @@ function buildSubgraph(inputDocument: DocumentNode): Subgraph {
   });
 
   const keyDirectiveName = link
-    ? linkedDirectiveName(link.imports, FEDERATION_NAMESPACE, 'key')
+    ? linkedDirectiveName(link.imports, link.namespace, 'key')
     : 'key';
 
   const synthesizedDefinitions = synthesizeMissingDefinitions(userDocument);
