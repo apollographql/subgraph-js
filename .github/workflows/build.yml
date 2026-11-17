@@ -11,6 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         node-version: ['22', '24', 'latest']
+        graphql-version: ['16', '17']
 
     steps:
       - uses: actions/checkout@v7
@@ -23,6 +24,17 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The root devDependency is graphql v16 so that the compatibility suite in
+      # compatibility/ (which runs this package inside Apollo Server v5, a
+      # graphql v16 consumer) uses a single copy of graphql. The library also
+      # supports graphql v17, so swap it in here to run the unit tests against
+      # it. Note that this only covers the unit tests, typecheck and build: the
+      # compatibility suite itself still runs only on v16 (see
+      # compatibility.yml) until an Apollo Server release accepts graphql v17.
+      - name: Use graphql ${{ matrix.graphql-version }}
+        if: matrix.graphql-version != '16'
+        run: npm install --no-save graphql@${{ matrix.graphql-version }}
 
       - name: Check formatting
         run: npm run format:check

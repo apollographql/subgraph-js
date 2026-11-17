@@ -457,6 +457,37 @@ describe('@link', () => {
     );
   });
 
+  it('names link specification types after the link spec imports without a federation link', () => {
+    const schema = buildSubgraphSchema(
+      parse(`
+        extend schema @link(url: "https://specs.apollo.dev/link/v1.0", import: [{ name: "Purpose", as: "LinkPurpose" }])
+        type Query { hello: String }
+      `),
+    );
+
+    expect(schema.getType('LinkPurpose')).toBeDefined();
+    expect(schema.getType('link__Purpose')).toBeUndefined();
+    expect(
+      schema
+        .getDirective('link')!
+        .args.find((arg) => arg.name === 'for')!
+        .type.toString(),
+    ).toBe('LinkPurpose');
+  });
+
+  it('rejects an import the link specification does not define without a federation link', () => {
+    expect(() =>
+      buildSubgraphSchema(
+        parse(`
+          extend schema @link(url: "https://specs.apollo.dev/link/v1.0", import: ["FieldSet"])
+          type Query { hello: String }
+        `),
+      ),
+    ).toThrow(
+      'Cannot import "FieldSet": it is not part of the link specification v1.0.',
+    );
+  });
+
   it('defines @link for a schema that only links a custom specification', () => {
     const schema = buildSubgraphSchema(
       parse(`

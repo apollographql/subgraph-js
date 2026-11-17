@@ -1,6 +1,6 @@
 {
   "name": "@apollo/subgraph",
-  "version": "2.15.1",
+  "version": "2.16.0",
   "description": "Apollo Federation subgraph utilities built on graphql-js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -46,7 +46,7 @@
     "@graphql-tools/utils": "^12.0.0"
   },
   "peerDependencies": {
-    "graphql": "^16.11.0"
+    "graphql": "^16.11.0 || ^17.0.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.0",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.16.0
+
+### Minor Changes
+
+- [#25](https://github.com/apollographql/subgraph-js/pull/25) [`2085b86`](https://github.com/apollographql/subgraph-js/commit/2085b865704b566cedd23fdf63770ac15461cb11) Thanks [@glasser](https://github.com/glasser)! - Allow `graphql` v17 as a peer dependency (`^16.11.0 || ^17.0.0`). CI now runs the test suite against both v16 and v17.
+
 ## 2.15.1
 
 ### Patch Changes
